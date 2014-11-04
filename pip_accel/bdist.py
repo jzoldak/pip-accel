@@ -33,12 +33,15 @@ from boto.s3.key import Key
 from humanfriendly import Spinner, Timer
 
 # Modules included in our package.
-from pip_accel.config import binary_index, on_debian, s3_cache_bucket, s3_cache_prefix
+from pip_accel.config import binary_index, on_debian
 from pip_accel.deps import sanity_check_dependencies
 from pip_accel.utils import get_python_version
 
 # Initialize a logger for this module.
 logger = logging.getLogger(__name__)
+
+S3_CACHE_BUCKET = os.environ.get('PIP_S3_CACHE_BUCKET')
+S3_CACHE_PREFIX = os.environ.get('PIP_S3_CACHE_PREFIX')
 
 def get_binary_dist(package, version, directory, url=None, python='/usr/bin/python', prefix='/usr'):
     """
@@ -331,7 +334,7 @@ class NoBuildOutput(Exception):
 def cache_file_exists(cache_file, binary_index):
     if os.path.isfile(cache_file):
         return True
-    if s3_cache_bucket is None:
+    if S3_CACHE_BUCKET is None:
         return False
     bucket = get_s3_bucket()
     s3_key = get_s3_key_path(binary_index, cache_file)
@@ -344,7 +347,7 @@ def cache_file_exists(cache_file, binary_index):
 
 
 def store_file_into_s3_cache(cache_file, binary_index):
-    if s3_cache_bucket is None:
+    if S3_CACHE_BUCKET is None:
         return False
     logger.debug("Storing {} into S3 cache.".format(cache_file, binary_index))
     bucket = get_s3_bucket()
@@ -357,11 +360,11 @@ def store_file_into_s3_cache(cache_file, binary_index):
 
 
 def get_s3_key_path(binary_index, cache_file):
-    return '/'.join([s3_cache_prefix, cache_file.replace(binary_index + '/', '')])
+    return '/'.join([S3_CACHE_PREFIX, cache_file.replace(binary_index + '/', '')])
 
 
 def get_s3_bucket():
-    return get_s3_connection().get_bucket(s3_cache_bucket)
+    return get_s3_connection().get_bucket(S3_CACHE_BUCKET)
 
 
 def get_s3_connection():
