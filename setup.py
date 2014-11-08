@@ -41,6 +41,4 @@ setup(name='pip-accel',
       packages=find_packages(),
       entry_points={'console_scripts': ['pip-accel = pip_accel:main']},
       package_data={'pip_accel.deps': ['*.ini']},
-      install_requires=requirements,
-      tests_require=['virtualenv'],
-      test_suite='pip_accel_tests')
+      install_requires=requirements)

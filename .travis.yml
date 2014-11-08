@@ -4,9 +4,9 @@ python:
   - "2.7"
   - "3.4"
 install:
-  - pip install coveralls
+  - pip install -r test_requirements.txt
   - python setup.py install
 script:
-  coverage run --source=pip_accel setup.py test
+  coverage run --source=pip_accel -m nose tests
 after_success:
   coveralls
