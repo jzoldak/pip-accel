@@ -50,6 +50,4 @@ setup(name='pip-accel',
       },
       extras_require={'s3': 'boto >= 2.32'},
       package_data={'pip_accel.deps': ['*.ini']},
-      install_requires=requirements,
-      tests_require=['virtualenv'],
-      test_suite='pip_accel_tests')
+      install_requires=requirements)

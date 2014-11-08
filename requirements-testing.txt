@@ -1,1 +1,5 @@
 tox >= 1.7.2
+coveralls
+virtualenv
+nose==1.3.0
+mock==1.0b1
