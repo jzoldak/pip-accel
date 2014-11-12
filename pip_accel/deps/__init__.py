@@ -26,7 +26,7 @@ except ImportError:
     import configparser
 
 # Modules included in our package.
-from pip_accel.config import on_debian
+from pip_accel.utils import on_debian
 
 # Initialize a logger for this module.
 logger = logging.getLogger(__name__)
@@ -216,7 +216,7 @@ class DebianLinux(BasePlatform):
 
         :returns: ``True`` if we are, ``False`` if we're not.
         """
-        if on_debian:
+        if on_debian():
             logger.debug("Looks like we are on a Debian (derived) system ..")
             return True
         else:

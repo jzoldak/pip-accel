@@ -32,9 +32,9 @@ from humanfriendly import Spinner, Timer
 
 # Modules included in our package.
 import pip_accel
-from pip_accel.config import binary_index, on_debian
+from pip_accel.config import binary_index
 from pip_accel.deps import sanity_check_dependencies
-from pip_accel.utils import get_python_version
+from pip_accel.utils import get_python_version, on_debian
 
 # Initialize a logger for this module.
 logger = logging.getLogger(__name__)
@@ -258,7 +258,7 @@ def install_binary_dist(members, prefix, python='/usr/bin/python', virtualenv_co
             # implement the same workaround that pip uses to avoid this
             # problem.
             pathname = re.sub('^include/', 'include/site/', pathname)
-        if on_debian and '/site-packages/' in pathname:
+        if on_debian() and '/site-packages/' in pathname:
             # On Debian based system wide Python installs the /site-packages/
             # directory is not in Python's module search path while
             # /dist-packages/ is. We try to be compatible with this.

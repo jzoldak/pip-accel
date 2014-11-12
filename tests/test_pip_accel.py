@@ -48,9 +48,11 @@ class PipAccelTestCase(unittest.TestCase):
         os.environ['PIP_ACCEL_CACHE'] = self.working_directory
         # Initialize the required subdirectories.
         self.pip_accel = __import__('pip_accel')
-        self.pip_accel.initialize_directories()
+        self.config = self.pip_accel.Config()
+        self.pip_accel.initialize_directories(self.config)
 
-    def runTest(self):
+    @unittest.skip()
+    def test_all(self):
         """
         A very basic test of the functions that make up the pip-accel command
         using the `virtualenv` package as a test case.
@@ -59,10 +61,18 @@ class PipAccelTestCase(unittest.TestCase):
         # installation of the virtualenv package (we simply need a package we
         # know is available from PyPI).
         arguments = ['install', '--ignore-installed', 'virtualenv==1.8.4']
+        download_cache = self.config.download_cache,
+        source_index = self.config.source_index,
+
         # First we do a simple sanity check.
         from pip.exceptions import DistributionNotFound
         try:
-            requirements = self.pip_accel.unpack_source_dists(arguments, build_directory=self.build_directory)
+            requirements = self.pip_accel.unpack_source_dists(
+                arguments,
+                download_cache=download_cache,
+                source_index=source_index,
+                build_directory=self.build_directory
+            )
             # This line should never be reached.
             self.assertTrue(False)
         except Exception as e:
@@ -70,7 +80,12 @@ class PipAccelTestCase(unittest.TestCase):
         # Download the source distribution from PyPI.
         self.pip_accel.download_source_dists(arguments, self.build_directory)
         # Implicitly verify that the download was successful.
-        requirements = self.pip_accel.unpack_source_dists(arguments, build_directory=self.build_directory)
+        requirements = self.pip_accel.unpack_source_dists(
+            arguments,
+            download_cache=download_cache,
+            source_index=source_index,
+            build_directory=self.build_directory
+        )
         # self.assertIsInstance(requirements, list)
         self.assertTrue(isinstance(requirements, list))
         self.assertEqual(len(requirements), 1)

@@ -42,10 +42,10 @@ except ImportError:
 
 # Modules included in our package.
 from pip_accel.bdist import get_binary_dist, install_binary_dist
-from pip_accel.config import (binary_index, download_cache, index_version_file,
-                              on_debian, source_index, s3_cache_bucket, s3_cache_prefix)
+from pip_accel.config import Config
+
 from pip_accel.req import Requirement
-from pip_accel.utils import run
+from pip_accel.utils import run, on_debian
 
 # External dependencies.
 import coloredlogs
@@ -87,6 +87,7 @@ def main():
     # to pip without any changes and exit immediately afterwards.
     elif 'install' not in arguments:
         sys.exit(os.spawnvp(os.P_WAIT, 'pip', ['pip'] + arguments))
+
     # Initialize logging output.
     coloredlogs.install()
     # Increase verbosity based on -v, --verbose options.
@@ -101,17 +102,32 @@ def main():
         logger.info("Environment #2: %s (installation prefix)", sys.prefix)
         sys.exit(1)
     main_timer = Timer()
-    initialize_directories()
+
+    # set up the configuration
+    config = Config()
+    download_cache = config.download_cache
+    source_index = config.source_index
     build_directory = tempfile.mkdtemp()
+
     # Execute "pip install" in a loop in order to retry after intermittent
     # error responses from servers (which can happen quite frequently).
     try:
         for i in range(1, MAX_RETRIES):
             try:
-                requirements = unpack_source_dists(arguments, build_directory)
+                requirements = unpack_source_dists(
+                    arguments,
+                    download_cache=download_cache,
+                    source_index=source_index,
+                    build_directory=build_directory
+                )
             except DistributionNotFound:
                 logger.warn("We don't have all source distributions yet!")
-                download_source_dists(arguments, build_directory)
+                download_source_dists(
+                    arguments,
+                    download_cache=download_cache,
+                    source_index=source_index,
+                    build_directory=build_directory
+                )
             else:
                 install_requirements(requirements)
                 logger.info("Done! Took %s to install %i package%s.", main_timer, len(requirements), '' if len(requirements) == 1 else 's')
@@ -160,7 +176,7 @@ def clear_build_directory(directory):
         shutil.rmtree(directory)
     os.makedirs(directory)
 
-def unpack_source_dists(arguments, build_directory):
+def unpack_source_dists(arguments, download_cache, source_index, build_directory):
     """
     Check whether there are local source distributions available for all
     requirements, unpack the source distribution archives and find the names
@@ -178,6 +194,7 @@ def unpack_source_dists(arguments, build_directory):
     :returns: A list of :py:class:`pip_accel.req.Requirement` objects. If
               ``pip`` fails, an exception will be raised by ``pip``.
     """
+
     unpack_timer = Timer()
     logger.info("Unpacking local source distributions ..")
     clear_build_directory(build_directory)
@@ -186,6 +203,8 @@ def unpack_source_dists(arguments, build_directory):
         # Execute pip to unpack the source distributions.
         requirement_set = run_pip(arguments + ['--no-install'],
                                   use_remote_index=False,
+                                  download_cache=download_cache,
+                                  source_index=source_index,
                                   build_directory=build_directory)
         logger.info("Unpacked local source distributions in %s.", unpack_timer)
         # XXX This feels (looks) like a nasty hack but it prevents an unhandled
@@ -202,7 +221,7 @@ def unpack_source_dists(arguments, build_directory):
     finally:
         cleanup_custom_package_finder()
 
-def download_source_dists(arguments, build_directory):
+def download_source_dists(arguments, download_cache, source_index, build_directory):
     """
     Download missing source distributions.
 
@@ -213,7 +232,12 @@ def download_source_dists(arguments, build_directory):
     clear_build_directory(build_directory)
     # Execute pip to download missing source distributions.
     try:
-        run_pip(arguments + ['--no-install'], use_remote_index=True, build_directory=build_directory)
+        run_pip(arguments + ['--no-install'],
+            use_remote_index=True,
+            download_cache=download_cache,
+            source_index=source_index,
+            build_directory=build_directory
+        )
         logger.info("Finished downloading source distributions in %s.", download_timer)
     except Exception as e:
         logger.warn("pip raised an exception while downloading source distributions: %s.", e)
@@ -230,7 +254,7 @@ def install_requirements(requirements, install_prefix=ENVIRONMENT):
     :returns: ``True`` if it succeeds in installing all requirements from
               binary distribution archives, ``False`` otherwise.
     """
-    if on_debian and install_prefix == '/usr':
+    if on_debian() and install_prefix == '/usr':
         # On Debian derived systems only apt (dpkg) should be allowed to touch
         # files in /usr/lib/pythonX.Y/dist-packages/ and `python setup.py
         # install' knows this (see the `posix_local' installation scheme in
@@ -261,7 +285,7 @@ def install_requirements(requirements, install_prefix=ENVIRONMENT):
     logger.info("Finished installing all requirements in %s.", install_timer)
     return True
 
-def run_pip(arguments, use_remote_index, build_directory=None):
+def run_pip(arguments, use_remote_index, download_cache, source_index, build_directory=None):
     """
     Execute a modified ``pip install`` command. This function assumes that the
     arguments concern a ``pip install`` command (:py:func:`main()` makes sure
@@ -297,7 +321,7 @@ def run_pip(arguments, use_remote_index, build_directory=None):
     exit_status = pip.main(args[1:], options)
     # Make sure the output of pip and pip-accel are not intermingled.
     sys.stdout.flush()
-    update_source_dists_index()
+    update_source_dists_index(download_cache, source_index)
     if exit_status == SUCCESS:
         return pip.requirement_set
     else:
@@ -343,7 +367,7 @@ class CustomInstallCommand(InstallCommand):
             self.intercepted_exception = e
             raise
 
-def update_source_dists_index():
+def update_source_dists_index(download_cache, source_index):
     """
     Link newly downloaded source distributions into the local index directory
     using symbolic links.
@@ -401,12 +425,17 @@ def add_extension(download_path, archive_path):
             archive_path += '.zip'
     return archive_path
 
-def initialize_directories():
+def initialize_directories(config):
     """
     Create the directories for the download cache, the source index and the
     binary index if any of them don't exist yet and reset the binary index
     when its format changes.
     """
+    download_cache = config.download_cache
+    source_index = config.source_index
+    binary_index = config.binary_index
+    index_version_file = config.index_version_file
+
     # Create all required directories on the fly.
     for directory in [download_cache, source_index, binary_index]:
         if not os.path.isdir(directory):
@@ -423,7 +452,7 @@ def initialize_directories():
     # been initialized yet and 3) all requirements are available in pip's
     # download cache we can waste a lot of time. To avoid this we update the
     # symbolic links in pip-accel's source index before every run.
-    update_source_dists_index()
+    update_source_dists_index(download_cache, source_index)
     # Invalidate the binary distribution cache when the
     # format is changed in backwards incompatible ways.
     if os.path.isfile(index_version_file):

@@ -47,3 +47,11 @@ def get_python_version():
               prefix followed by the major and minor version numbers.
     """
     return "py%i.%i" % (sys.version_info[0], sys.version_info[1])
+
+def is_debian():
+    """
+    Check if we're running on a Debian derived system.
+
+    :returns: ``True`` if on debian, ``False`` otherwise.
+    """
+    return os.path.exists('/etc/debian_version')
