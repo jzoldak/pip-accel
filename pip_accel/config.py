@@ -28,8 +28,9 @@ if 'PIP_ACCEL_CACHE' in os.environ:
     pip_accel_cache = expand_user(os.environ['PIP_ACCEL_CACHE'])
 
 # Get the S3 configuration options (if set).
-s3_cache_bucket = os.environ.get('PIP_ACCEL_S3_BUCKET')
-s3_cache_prefix = os.environ.get('PIP_ACCEL_S3_PREFIX', '')
+# Hard code this - DO NOT MERGE
+s3_cache_bucket = os.environ.get('PIP_ACCEL_S3_BUCKET', 'edx-platform-pip-accel-cache')
+s3_cache_prefix = os.environ.get('PIP_ACCEL_S3_PREFIX', 'precise64')
 
 # Generate the absolute pathnames of the source/binary caches.
 source_index = os.path.join(pip_accel_cache, 'sources')
